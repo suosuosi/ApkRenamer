@@ -1,0 +1,14 @@
+#斗鱼
+air.tv.douyu.android  
+#快手
+com.smile.gifmaker
+#优酷
+com.youku.phone
+#腾讯视频
+com.tencent.qqlive
+#开心消消乐
+com.happyelements.AndroidAnimal
+#腾讯会议
+com.tencent.wemeet.app
+#斗地主
+com.qqgame.hlddz
