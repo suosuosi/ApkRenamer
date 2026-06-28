@@ -1,120 +1,90 @@
-# APK 包名替换工具
-
-一键apk反编译、包名替换、打包、签名工具。
+# ApkRenamer -- APK 包名替换工具
 
 将 APK 的包名替换为其他包名，适用于车机等设备对特定包名有验证的场景。
-
----
 
 ## 环境要求
 
 - **Java**: JDK 17+
 - **Python**: 3.8+
 
----
-
-## 使用方法
-
-### 第一步：放入 APK
-
-将待处理的 APK 文件放入 `apk/` 目录（支持多个 APK 文件）。
-
-### 第二步：运行脚本
-
-双击运行或执行：
+## 快速开始
 
 ```bash
-python repackage_apk.py
+python build_apk.py
 ```
 
-### 第三步：选择 APK
+程序提供交互式菜单，按步骤操作即可。
 
-脚本会自动扫描 `apk/` 目录，显示所有 APK 文件供选择。
+## 功能模式
 
-### 第四步：选择目标包名
+### 1. 全自动模式 (推荐)
+一键完成：反编译 → 智能修改包名 → 编译签名。自动检测是否包含 `.so` 动态库，智能选择改包名方式。
 
-从 `name.txt` 中的预置包名列表选择，或直接回车使用第一个。
+### 2. 反编译
+将 `apk/` 目录下的 APK 解包到 `decoded/` 目录，使用 [APKEditor](https://github.com/REAndroid/APKEditor) 解码。
 
-### 第五步：等待完成
+### 3. 修改包名（智能）
+基于检测结果**自动选择**两种模式：
+- **包名+类路径模式**：修改 manifest 包名 + 替换所有文件中的包名引用 + 重命名 smali 目录结构
+- **仅包名模式**：只修改 manifest 包名和完整包名字符串，保留类路径不动（适用于含 `.so` 的应用，避免 JNI 硬编码类名路径炸裂）
 
-脚本会自动完成：
-1. 反编译 APK
-2. 替换包名（包括 smali、xml、resources 等所有位置）
-3. 重新打包
-4. 签名
+### 4. 编译签名
+将 `decoded/` 下的解码目录重新打包为 APK 并签名，输出到 `output/` 目录（带时间戳）。
 
-输出 APK 位于 `apk/` 目录，文件名格式：`原包名_时间戳.apk`
+## 智能检测逻辑
 
----
+`auto_detect_mode()` 自动判断改包名策略：
+1. 扫描 `lib/` 目录是否有 `.so` 文件 → 有则走 `pkg_only`（不改类）
+2. 检查 `android:name` 是否以包名开头 → 否则走 `pkg_only`
+3. 两者都满足 → 走 `modify_pkg`（含类）
+
+类路径前缀检测 `detect_class_prefix()` 支持三级策略：
+1. 优先匹配包名下的类
+2. 匹配同前两段的类（过滤 alipay、tencent 等第三方）
+3. 回退使用包名本身
 
 ## 配置文件
 
-### name.txt - 包名列表
-
-在 `name.txt` 中配置可用的目标包名：
+### name.txt — 包名列表
 
 ```txt
 #斗鱼
 air.tv.douyu.android
 #快手
 com.smile.gifmaker
-#优酷
-com.youku.phone
-#斗地主
-com.qqgame.hlddz
 ```
 
-格式说明：
-- `#` 开头的行表示注释/描述
-- 空白行会被忽略
-
----
+- `#` 开头的行表示描述
+- 非空行即为目标包名
 
 ## 目录结构
 
 ```
-apk_editer/
-├── README.md                    # 本说明文档
-├── repackage_apk.py             # 主程序 (双击运行)
-├── name.txt                    # 目标包名配置
-├── apk/                        # APK文件目录
-│   ├── xxx.apk                 # 放入待处理的APK
-│   └── 原包名_时间戳.apk       # 输出的签名APK
-├── log/                        # 日志目录
-└── libs/                       # 工具库
-    ├── APKEditor.jar           # APK编辑器
-    ├── uber-apk-signer.jar     # APK签名工具
-    ├── debug.keystore          # 签名密钥
-    ├── fix_package.py          # 批量替换脚本 (备用)
-    └── view_apk_info.py        # 查看APK信息 (备用)
-```
+apkRenamer2/
+├── build_apk.py                 # 主程序（交互式菜单）
+├── repackage_apk_by_step.py     # 分步执行脚本（每步确认）
+├── name.txt                     # 目标包名配置
+├── apk/                         # 放入待处理的 APK 文件
+├── decoded/                     # 反编译后的解码目录
+├── output/                      # 编译输出的签名 APK（带时间戳）
+├── log/                         # 分步脚本的运行日志
+├── libs/
+│   ├── APKEditor.jar            # APK 解包/打包工具
+│   ├── uber-apk-signer.jar      # APK 签名工具
+│   ├── debug.keystore           # 调试签名密钥（自动生成）
+│   ├── fix_package.py           # 命令行批量替换脚本（备用）
+│   └── view_apk_info.py         # APK 信息查看工具（备用）
 
----
+```
 
 ## 常见问题
 
-### 1. 安装后闪退
+### 安装后闪退
+- 包名替换不完整，或应用存在包名校验
+- 如果原 APK 含 `.so` 动态库，确保走的是「仅改包名」模式
 
-可能原因：
-- 包名替换不完整
-- 应用有包名校验
+### 签名不一致
+先卸载手机上旧应用再安装新 APK
 
-解决：确保目标包名正确，或尝试其他包名。
-
-### 2. 提示 "签名不一致"
-
-先 **卸载手机上已安装的同名应用**，再安装新的 APK。
-
-### 3. apk 目录下没有 APK 文件
-
-确保将 APK 文件放入 `apk/` 目录后重新运行脚本。
-
----
-
-## 注意事项
-
-1. 替换包名后，应用数据会重置
-2. 部分应用有包名校验，替换后可能无法运行
-3. 仅供学习和测试使用
-
----
+### 支持哪些 APK
+支持没有加固/壳的普通 APK。加壳 APK 解码后 smali 文件过少，程序会给出警告
